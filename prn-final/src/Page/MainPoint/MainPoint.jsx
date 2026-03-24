@@ -65,7 +65,9 @@ const MainPoint = () => {
   const [gradeDetailsMap, setGradeDetailsMap] = useState({});
   const [gradeHistory, setGradeHistory] = useState([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [driveImageError, setDriveImageError] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [examDescriptionInline, setExamDescriptionInline] = useState("");
   const debounceTimerRef = useRef({});
 
   // States for plagiarism check
@@ -145,6 +147,7 @@ const MainPoint = () => {
     fetchStudentData();
   }, [fetchStudentData]);
 
+  // Không load ExamPaperInline ngay khi vào trang, chỉ load khi mở modal để tăng tốc độ
   useEffect(() => {
     const fetchExam = async () => {
       if (!examId) return;
@@ -152,19 +155,53 @@ const MainPoint = () => {
       try {
         setLoadingExam(true);
         const res = await axiosInstance.get(`/exams/${examId}`);
-        if (res.data && res.data.data && res.data.data.examPaper) {
-          console.log("Exam paper URL:", res.data.data.examPaper);
-          setExamDescription(res.data.data.examPaper);
+        if (res.data && res.data.data) {
+          const payload = res.data.data;
+          // ExamPaper có thể là null (nếu ảnh được lưu trực tiếp trong DB)
+          setExamDescription(payload.examPaper || "");
+          // ExamPaperInline chỉ load khi mở modal để tránh load dữ liệu lớn không cần thiết
+        } else {
+          setExamDescription("");
         }
         setLoadingExam(false);
       } catch (err) {
         console.error("Lỗi fetch exam description:", err);
         setLoadingExam(false);
+        setExamDescription("");
       }
     };
 
     fetchExam();
   }, [examId]);
+
+  // Load ExamPaperInline chỉ khi mở modal
+  const fetchExamPaperInline = async () => {
+    if (!examId || examDescriptionInline) return; // Đã có rồi thì không load lại
+
+    try {
+      const res = await axiosInstance.get(`/exams/${examId}/paper-inline`);
+      if (res.data && res.data.data) {
+        setExamDescriptionInline(res.data.data);
+      }
+    } catch (err) {
+      console.error("Lỗi fetch exam paper inline:", err);
+    }
+  };
+
+  useEffect(() => {
+    setDriveImageError(false);
+  }, [examDescription, examDescriptionInline]);
+
+  useEffect(() => {
+    setDriveImageError(false);
+  }, [examDescription]);
+
+  // Load ExamPaperInline khi mở modal
+  useEffect(() => {
+    if (showDescriptionModal && !examDescriptionInline && examId) {
+      fetchExamPaperInline();
+    }
+  }, [showDescriptionModal, examId]);
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -469,10 +506,106 @@ const MainPoint = () => {
     }
   };
 
+  const extractGoogleFileId = (input) => {
+    if (!input) return null;
+    const directMatch = input.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (directMatch) return directMatch[1];
+    const idParam = input.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (idParam) return idParam[1];
+    return null;
+  };
+
   const getOfficeViewerUrl = (url) => {
     if (!url) return "";
+
+    if (url.includes("docs.google.com") || url.includes("drive.google.com")) {
+      const fileId = extractGoogleFileId(url);
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+      return url;
+    }
+
     const encodedUrl = encodeURIComponent(url);
     return `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+  };
+
+  const getDrivePreviewInfo = (url) => {
+    if (!url) return { isDrive: false, imageUrl: "", iframeUrl: "" };
+    if (!url.includes("docs.google.com") && !url.includes("drive.google.com")) {
+      return { isDrive: false, imageUrl: url, iframeUrl: "" };
+    }
+
+    const fileId = extractGoogleFileId(url);
+    if (!fileId) {
+      return { isDrive: false, imageUrl: url, iframeUrl: "" };
+    }
+
+    return {
+      isDrive: true,
+      imageUrl: `https://drive.google.com/uc?export=view&id=${fileId}`,
+      iframeUrl: `https://drive.google.com/file/d/${fileId}/preview`
+    };
+  };
+
+  const renderExamDescriptionBody = () => {
+    if (examDescriptionInline) {
+      return (
+        <img
+          src={examDescriptionInline}
+          alt="Đề bài"
+          style={{ width: '100%', height: 'auto', borderRadius: 8, display: 'block' }}
+          onError={() => setExamDescriptionInline("")}
+        />
+      );
+    }
+
+    if (examDescription) {
+      const preview = getDrivePreviewInfo(examDescription);
+      if (preview.isDrive) {
+        return (
+          <>
+            <iframe
+              src={preview.iframeUrl}
+              title="Đề bài"
+              style={{ width: '100%', height: '70vh', border: 'none', borderRadius: 8 }}
+              allowFullScreen
+            ></iframe>
+            <div style={{ marginTop: 16 }}>
+              {!driveImageError ? (
+                <img
+                  src={preview.imageUrl}
+                  alt="Đề bài"
+                  style={{ width: '100%', height: 'auto', borderRadius: 8, display: 'block' }}
+                  onError={() => setDriveImageError(true)}
+                />
+              ) : (
+                <div style={{ textAlign: 'center' }}>
+                  <Text type="secondary">
+                    Google Drive không cho phép xem trực tiếp.{" "}
+                    <a href={preview.imageUrl} target="_blank" rel="noreferrer">
+                      Bấm để mở/tải ảnh
+                    </a>
+                  </Text>
+                </div>
+              )}
+            </div>
+          </>
+        );
+      }
+
+      if (preview.imageUrl) {
+        return (
+          <img
+            src={preview.imageUrl}
+            alt="Đề bài"
+            style={{ width: '100%', height: 'auto', borderRadius: 8, display: 'block' }}
+          />
+        );
+      }
+    }
+
+    return <Empty description="Không có đề bài" />;
   };
 
   const handleNext = () => {
@@ -607,41 +740,6 @@ const MainPoint = () => {
       </Header>
 
       <Layout>
-        {/* Sidebar - Barem */}
-        <Sider
-          width={isBaremCollapsed ? 60 : 400}
-          theme="light"
-          collapsible
-          collapsed={isBaremCollapsed}
-          onCollapse={setIsBaremCollapsed}
-          trigger={null}
-          style={{
-            background: '#fff',
-            borderRight: '1px solid #f0f0f0',
-            overflow: 'auto',
-            height: 'calc(100vh - 64px)',
-            position: 'sticky',
-            top: 64
-          }}
-        >
-          <GradingSidebar
-            isBaremCollapsed={isBaremCollapsed}
-            setIsBaremCollapsed={setIsBaremCollapsed}
-            setShowDescriptionModal={setShowDescriptionModal}
-            loadingQuestions={loadingQuestions}
-            questions={questions}
-            score={score}
-            handleInput={handleInput}
-            comment={comment}
-            setComment={setComment}
-            setSaveMessage={setSaveMessage}
-            calculateTotalScore={calculateTotalScore}
-            saveMessage={saveMessage}
-            saving={saving}
-            handleSave={handleSave}
-          />
-        </Sider>
-
         {/* Main Content - Document Viewer */}
         <Content style={{ background: '#fff' }}>
           {loading ? (
@@ -688,6 +786,41 @@ const MainPoint = () => {
             <Empty description="Không có file để hiển thị" />
           )}
         </Content>
+
+        {/* Sidebar - Barem (Right Side) */}
+        <Sider
+          width={isBaremCollapsed ? 60 : 480}
+          theme="light"
+          collapsible
+          collapsed={isBaremCollapsed}
+          onCollapse={setIsBaremCollapsed}
+          trigger={null}
+          style={{
+            background: '#fff',
+            borderLeft: '1px solid #f0f0f0',
+            overflow: 'auto',
+            height: 'calc(100vh - 64px)',
+            position: 'sticky',
+            top: 64
+          }}
+        >
+          <GradingSidebar
+            isBaremCollapsed={isBaremCollapsed}
+            setIsBaremCollapsed={setIsBaremCollapsed}
+            setShowDescriptionModal={setShowDescriptionModal}
+            loadingQuestions={loadingQuestions}
+            questions={questions}
+            score={score}
+            handleInput={handleInput}
+            comment={comment}
+            setComment={setComment}
+            setSaveMessage={setSaveMessage}
+            calculateTotalScore={calculateTotalScore}
+            saveMessage={saveMessage}
+            saving={saving}
+            handleSave={handleSave}
+          />
+        </Sider>
       </Layout>
 
       {/* Description Modal */}
@@ -710,7 +843,7 @@ const MainPoint = () => {
               <Text type="secondary">Đang tải đề bài...</Text>
             </div>
           </div>
-        ) : examDescription ? (
+        ) : (examDescriptionInline || examDescription) ? (
           <div
             style={{
               width: '100%',
@@ -721,16 +854,7 @@ const MainPoint = () => {
               borderRadius: 8,
             }}
           >
-            <img
-              src={examDescription}
-              alt="Đề bài"
-              style={{
-                width: '100%',
-                height: 'auto',
-                borderRadius: 8,
-                display: 'block',
-              }}
-            />
+            {renderExamDescriptionBody()}
           </div>
         ) : (
           <Empty description="Không có đề bài" />

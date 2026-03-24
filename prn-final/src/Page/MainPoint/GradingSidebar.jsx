@@ -106,45 +106,106 @@ const GradingSidebar = ({
                     {question.rubrics && question.rubrics.length > 0 && (
                       <Space direction="vertical" style={{ width: '100%' }} size="small">
                         {question.rubrics.map((rubric) => (
-                          <div key={rubric.id}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                              <Text strong style={{ fontSize: '12px', flex: 1 }}>
-                                {rubric.criterion}
-                              </Text>
-                              <Text strong style={{ fontSize: '11px', marginLeft: 8 }}>
-                                max: {rubric.maxScore}
-                              </Text>
+                          <div key={rubric.id} style={{ marginBottom: 8 }}>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'nowrap', justifyContent: 'space-between' }}>
+                              <div style={{ flex: '0 1 auto', minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                  <Text strong style={{ fontSize: '12px' }}>
+                                    {rubric.criterion}
+                                  </Text>
+                                  <Text strong style={{ fontSize: '11px', marginLeft: 8 }}>
+                                    max: {rubric.maxScore}
+                                  </Text>
+                                </div>
+                                <div style={{ color: '#6c757d', fontSize: 12 }}>{rubric.description}</div>
+                              </div>
+
+                              <div style={{ width: 165, flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+                                <InputNumber
+                                  style={{ width: '100%', boxSizing: 'border-box' }}
+                                  min={0}
+                                  max={rubric.maxScore}
+                                  step={rubric.maxScore === 1 ? 0.25 : 0.5}
+                                  precision={rubric.maxScore === 1 ? 2 : 1}
+                                  placeholder={`0 - ${rubric.maxScore}`}
+                                  value={score[rubric.id] || ""}
+                                  onChange={(value) => {
+                                    if (value === null || value === undefined) {
+                                      handleInput(rubric.id, value);
+                                      return;
+                                    }
+                                    if (value >= 0 && value <= rubric.maxScore) {
+                                      handleInput(rubric.id, value);
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    const value = parseFloat(e.target.value);
+                                    if (!isNaN(value)) {
+                                      if (value < 0) {
+                                        handleInput(rubric.id, 0);
+                                      } else if (value > rubric.maxScore) {
+                                        handleInput(rubric.id, rubric.maxScore);
+                                      }
+                                    }
+                                  }}
+                                />
+
+                                {/* Quick score buttons */}
+                                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+                                  {(() => {
+                                    const renderButton = (b) => {
+                                      const isSelected = Math.abs(parseFloat(score[rubric.id]) - parseFloat(b)) < 0.01;
+                                      return (
+                                        <Button
+                                          key={b}
+                                          size="small"
+                                          onClick={() => handleInput(rubric.id, parseFloat(b))}
+                                          style={{
+                                            padding: '2px 6px',
+                                            minWidth: 40,
+                                            backgroundColor: isSelected ? '#52c41a' : undefined,
+                                            borderColor: isSelected ? '#52c41a' : undefined,
+                                            color: isSelected ? '#fff' : undefined
+                                          }}
+                                        >
+                                          {Number.isInteger(b) ? `${b}` : `${b}`}
+                                        </Button>
+                                      );
+                                    };
+
+                                    // Chia thành các khung điểm: 0-1, 1-2, 2-3, ...
+                                    const maxScore = rubric.maxScore;
+                                    const numRanges = Math.ceil(maxScore);
+                                    const rows = [];
+
+                                    for (let range = 0; range < numRanges; range++) {
+                                      const rangeStart = range;
+                                      const rangeEnd = Math.min(range + 1, maxScore);
+                                      const buttonsInRange = [];
+
+                                      // Tạo các nút trong khung này: base + 0.25, base + 0.5, base + 0.75, base + 1
+                                      const increments = [0.25, 0.5, 0.75, 1];
+                                      increments.forEach(inc => {
+                                        const value = rangeStart + inc;
+                                        if (value <= maxScore) {
+                                          buttonsInRange.push(Math.round(value * 100) / 100);
+                                        }
+                                      });
+
+                                      if (buttonsInRange.length > 0) {
+                                        rows.push(
+                                          <div key={range} style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                            {buttonsInRange.map(renderButton)}
+                                          </div>
+                                        );
+                                      }
+                                    }
+
+                                    return rows.length > 0 ? <>{rows}</> : null;
+                                  })()}
+                                </div>
+                              </div>
                             </div>
-                            <InputNumber
-                              style={{ width: '100%' }}
-                              min={0}
-                              max={rubric.maxScore}
-                              step={rubric.maxScore === 1 ? 0.25 : 0.5}
-                              precision={rubric.maxScore === 1 ? 2 : 1}
-                              placeholder={`0 - ${rubric.maxScore}`}
-                              value={score[rubric.id] || ""}
-                              onChange={(value) => {
-                                if (value === null || value === undefined) {
-                                  handleInput(rubric.id, value);
-                                  return;
-                                }
-                                // Validate: value must be between 0 and max
-                                if (value >= 0 && value <= rubric.maxScore) {
-                                  handleInput(rubric.id, value);
-                                }
-                              }}
-                              onBlur={(e) => {
-                                const value = parseFloat(e.target.value);
-                                if (!isNaN(value)) {
-                                  // Ensure value is within range on blur
-                                  if (value < 0) {
-                                    handleInput(rubric.id, 0);
-                                  } else if (value > rubric.maxScore) {
-                                    handleInput(rubric.id, rubric.maxScore);
-                                  }
-                                }
-                              }}
-                            />
                           </div>
                         ))}
                         <Divider style={{ margin: '8px 0' }} />

@@ -34,6 +34,23 @@ const PlagiarismDetail = () => {
 
   const getOfficeViewerUrl = (url) => {
     if (!url) return "";
+
+    const extractGoogleId = (input) => {
+      const directMatch = input.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (directMatch) return directMatch[1];
+      const idParam = input.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (idParam) return idParam[1];
+      return null;
+    };
+
+    if (url.includes("docs.google.com") || url.includes("drive.google.com")) {
+      const fileId = extractGoogleId(url);
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+      return url;
+    }
+
     const encodedUrl = encodeURIComponent(url);
     return `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
   };

@@ -107,16 +107,25 @@ const ListStudent = () => {
 
   const handleExport = async () => {
     if (!examId) return;
+    const loadingKey = "export-excel";
 
     try {
       setExportLoading(true);
+      message.loading({
+        content: "Đang xuất file điểm, vui lòng chờ...",
+        key: loadingKey,
+        duration: 0,
+      });
 
       const response = await axiosInstance.post(`/exams/${examId}/export-excel`);
 
       const fileUrl = response.data?.data?.url;
 
       if (!fileUrl) {
-        message.error("Không tìm thấy file để tải.");
+        message.error({
+          content: "Không tìm thấy file để tải.",
+          key: loadingKey,
+        });
         return;
       }
 
@@ -131,10 +140,16 @@ const ListStudent = () => {
       link.click();
       link.remove();
 
-      message.success("Export thành công!");
+      message.success({
+        content: "Xuất danh sách điểm thành công!",
+        key: loadingKey,
+      });
     } catch (err) {
       console.error("Lỗi export:", err);
-      message.error("Export thất bại!");
+      message.error({
+        content: "Xuất danh sách điểm thất bại!",
+        key: loadingKey,
+      });
     } finally {
       setExportLoading(false);
     }
