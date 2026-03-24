@@ -32,6 +32,15 @@ console.log("Axios instance created with baseURL:", axiosInstance.defaults.baseU
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
+    // Ngrok free: tránh trang cảnh báo (HTML) thay vì JSON khi gọi API
+    if (
+      config.baseURL &&
+      (config.baseURL.includes("ngrok-free.app") ||
+        config.baseURL.includes("ngrok.io"))
+    ) {
+      config.headers["ngrok-skip-browser-warning"] = "true";
+    }
+
     // Nếu là FormData, không set Content-Type để browser tự set với boundary
     if (config.data instanceof FormData) {
       delete config.headers["Content-Type"];
