@@ -87,7 +87,7 @@ const ListStudent = () => {
     if (!examId) return;
 
     try {
-      const res = await axiosInstance.get(`exams/${examId}/exam-students`, {
+      const res = await axiosInstance.get(`exams/${examId}/students`, {
         params: {
           Page: 1,
           Size: 1, // Chỉ cần 1 item để lấy totalItems
