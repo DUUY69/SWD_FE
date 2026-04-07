@@ -467,7 +467,7 @@ const MainPoint = () => {
         });
       }
     });
-    return total;
+    return Math.round(total * 100) / 100;
   };
 
   const handleSave = async () => {

@@ -22,6 +22,9 @@ import {
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
+/** Tránh 9.999999999999998 khi cộng nhiều điểm thập phân (0.3, 0.4, …) */
+const roundScoreTotal = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
 const GradingSidebar = ({
   isBaremCollapsed,
   setIsBaremCollapsed,
@@ -38,7 +41,9 @@ const GradingSidebar = ({
   saving,
   handleSave
 }) => {
-  const totalMaxScore = questions.reduce((sum, q) => sum + q.maxScore, 0);
+  const totalMaxScore = roundScoreTotal(
+    questions.reduce((sum, q) => sum + Number(q.maxScore || 0), 0)
+  );
   const currentTotalScore = calculateTotalScore();
 
   return (
@@ -80,10 +85,12 @@ const GradingSidebar = ({
           ) : (
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               {questions.map((question) => {
-                const questionScore = question.rubrics.reduce((sum, rubric) => {
-                  const rubricScore = parseFloat(score[rubric.id]) || 0;
-                  return sum + rubricScore;
-                }, 0);
+                const questionScore = roundScoreTotal(
+                  question.rubrics.reduce((sum, rubric) => {
+                    const rubricScore = parseFloat(score[rubric.id]) || 0;
+                    return sum + rubricScore;
+                  }, 0)
+                );
 
                 return (
                   <Card 
@@ -99,7 +106,7 @@ const GradingSidebar = ({
                     }
                     extra={
                       <Text strong style={{ fontSize: '12px' }}>
-                        Tối đa: {question.maxScore}đ
+                        Tối đa: {roundScoreTotal(question.maxScore)}đ
                       </Text>
                     }
                   >
@@ -214,7 +221,7 @@ const GradingSidebar = ({
                             Điểm câu này:
                           </Text>
                           <Text strong style={{ fontSize: '14px' }}>
-                            {questionScore.toFixed(1)} / {question.maxScore}
+                            {questionScore.toFixed(1)} / {roundScoreTotal(question.maxScore)}
                           </Text>
                         </div>
                       </Space>
